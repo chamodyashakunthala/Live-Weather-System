@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/chamodyashakunthala/Live-Weather-System/main/pic.png" width ="auto" alt="Disaster management Banner" />
+  <img src="https://raw.githubusercontent.com/chamodyashakunthala/Live-Weather-System/main/pic.png" width ="auto" alt="Live Weather system" />
 </p>
 
 
