@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Full-Screen Animated Weather Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+html,body{margin:0;padding:0;height:100%;overflow:hidden;font-family:Segoe UI,sans-serif;background:#0f2027;color:#00fff7;}
+#particles{position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;}
+.app{position:relative;z-index:2;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.card{background: rgba(0,0,0,0.6); padding:30px; border-radius:20px; text-align:center; width:90%; max-width:500px; box-shadow:0 0 50px rgba(0,255,231,0.5);}
+input{width:100%;padding:12px;margin-top:10px;border-radius:12px;border:none;outline:none;background:#000;color:#00fff7;font-size:14px;}
+button{width:100%;padding:12px;margin-top:10px;border-radius:12px;border:none;cursor:pointer;background:linear-gradient(90deg,#00ffe7,#007cf0);color:black;font-weight:bold;}
+button:hover{transform:scale(1.04);}
+.weather{margin-top:20px;font-size:16px;}
+#map{margin-top:15px;width:100%;height:200px;border-radius:12px;}
+canvas#tempChart{margin-top:15px;width:100%!important;height:200px!important;}
+</style>
+</head>
+<body>
+
+<canvas id="particles"></canvas>
+
+<div class="app">
+  <div class="card">
+    <h2>🌌 Neon Weather</h2>
+    <input id="city" placeholder="Enter city (optional)">
+    <button onclick="getWeather()">Get Weather</button>
+    <div class="weather" id="weather">Detecting location…</div>
+    <canvas id="tempChart"></canvas>
+    <div id="map"></div>
+  </div>
+</div>
+
+
+<audio id="rain" loop src="https://assets.mixkit.co/sfx/preview/mixkit-rain-loop-1256.mp3"></audio>
+<audio id="wind" loop src="https://assets.mixkit.co/sfx/preview/mixkit-wind-blowing-ambience-1309.mp3"></audio>
+<audio id="sun" loop src="https://assets.mixkit.co/sfx/preview/mixkit-bird-chirping-ambient-1355.mp3"></audio>
+<audio id="thunder" loop src="https://assets.mixkit.co/sfx/preview/mixkit-thunder-strike-ambient-1298.mp3"></audio>
+
+<script>
+const API_KEY = "f41cd46ac26921254f8cfda2e4f377c7";
+
+
+let temps=[], times=[];
+const chartCtx=document.getElementById("tempChart").getContext("2d");
+const chart=new Chart(chartCtx,{type:"line",data:{labels:times,datasets:[{data:temps,borderColor:"#00fff7",tension:0.4,fill:false}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#00fff7"}},y:{ticks:{color:"#00fff7"}}}}});
+
+
+let map, marker;
+function initMap(lat,lon){
+  if(!map){map=L.map("map").setView([lat,lon],10);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap"}).addTo(map);marker=L.marker([lat,lon]).addTo(map);}
+  else{map.setView([lat,lon],10);marker.setLatLng([lat,lon]);}
+}
+
+
+const canvas=document.getElementById("particles"), ctx=canvas.getContext("2d");
+let particles=[], w=canvas.width=window.innerWidth, h=canvas.height=window.innerHeight;
+window.addEventListener("resize",()=>{w=canvas.width=window.innerWidth; h=canvas.height=window.innerHeight;});
+function Particle(x,y,vx,vy,size,color){this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.size=size;this.color=color;this.update=function(){this.x+=this.vx;this.y+=this.vy;if(this.y>h)this.y=0;if(this.x>w)this.x=0;this.draw();};this.draw=function(){ctx.fillStyle=this.color;ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,2*Math.PI);ctx.fill();};}
+function createParticles(type){
+  particles=[];
+  for(let i=0;i<120;i++){
+    let size=Math.random()*2+1,x=Math.random()*w,y=Math.random()*h,vx=0,vy=0,color="#fff";
+    if(type==="rain"){vy=Math.random()*4+4;color="#00ccff";}
+    if(type==="snow"){vy=Math.random()*1+1;vx=Math.random()*1-0.5;color="#fff";}
+    if(type==="sun"){vy=0;vx=0;color="#ffff66";size=Math.random()*3+2;}
+    if(type==="thunder"){vy=Math.random()*6+2;color="#ffff00";size=Math.random()*3+2;}
+    particles.push(new Particle(x,y,vx,vy,size,color));
+  }
+}
+function animate(){ctx.clearRect(0,0,w,h);for(let p of particles)p.update();requestAnimationFrame(animate);}
+animate();
+
+
+const rainSound=document.getElementById("rain");
+const windSound=document.getElementById("wind");
+const sunSound=document.getElementById("sun");
+const thunderSound=document.getElementById("thunder");
+function playSounds(type){rainSound.pause();windSound.pause();sunSound.pause();thunderSound.pause();if(type.includes("rain")) rainSound.play(); else if(type.includes("snow")) windSound.play(); else if(type.includes("clear")) sunSound.play(); else if(type.includes("thunder")) thunderSound.play();}
+
+
+async function fetchWeather(url){const res=await fetch(url);return res.json();}
+async function updateUI(data){
+  if(!data||data.cod!==200){document.getElementById("weather").innerHTML="❌ Weather not found"; return;}
+  const cond=data.weather[0].main.toLowerCase();
+  playSounds(cond);
+  if(cond.includes("rain")) createParticles("rain");
+  else if(cond.includes("snow")) createParticles("snow");
+  else if(cond.includes("clear")) createParticles("sun");
+  else if(cond.includes("thunder")) createParticles("thunder");
+  else createParticles("sun");
+
+  document.getElementById("weather").innerHTML=`<h3>${data.name}</h3>
+    <p>🌡️ ${data.main.temp} °C</p>
+    <p>💧 ${data.main.humidity}% | 🌬️ ${data.wind.speed} m/s</p>
+    <p>☁️ ${data.weather[0].description}</p>`;
+
+  temps.push(data.main.temp);times.push(new Date().toLocaleTimeString());
+  if(temps.length>10){temps.shift();times.shift();}
+  chart.update();
+  initMap(data.coord.lat,data.coord.lon);
+}
+
+async function getWeather(){
+  const city=document.getElementById("city").value;
+  if(city){
+    const data=await fetchWeather(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${API_KEY}`);
+    updateUI(data);
+  }else{
+    navigator.geolocation.getCurrentPosition(async pos=>{
+      const data=await fetchWeather(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=metric&appid=${API_KEY}`);
+      updateUI(data);
+    });
+  }
+}
+
+navigator.geolocation.getCurrentPosition(pos=>{
+  fetchWeather(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&units=metric&appid=${API_KEY}`).then(updateUI);
+});
+
+setInterval(getWeather,60000);
+</script>
+</body>
+</html>
